@@ -1,3 +1,4 @@
+import { readableOn } from '../lib/color'
 import { laneRows } from '../lib/timeline'
 import type { Window } from '../lib/timeline'
 import { LANES } from '../types'
@@ -38,11 +39,12 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
                   <button
                     key={event.id}
                     onClick={() => onSelect(event)}
-                    className="absolute inset-y-0 flex items-center overflow-hidden rounded-md px-2 text-left text-[11px] text-black/80 hover:brightness-110"
+                    className="absolute inset-y-0 flex items-center overflow-hidden rounded-md px-2 text-left text-[11px] hover:brightness-110"
                     style={{
                       left: `${leftPct}%`,
                       width: `${Math.max(widthPct, 1.5)}%`,
                       background: event.color,
+                      color: readableOn(event.color),
                     }}
                     title={event.name}
                   >
