@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CommandDeck } from './components/CommandDeck'
 import { TimelineGantt } from './components/TimelineGantt'
+import { TimelineRiver } from './components/TimelineRiver'
 import { useTimeline } from './data/useTimeline'
 import { useServer } from './state/store'
+import { useIsDesktop } from './state/useIsDesktop'
 import { SERVER_OFFSET } from './types'
 import type { ServerRegion } from './types'
 
@@ -17,6 +19,7 @@ export function App() {
   const state = useTimeline()
   const [server, setServer] = useServer()
   const [now, setNow] = useState(() => Date.now())
+  const isDesktop = useIsDesktop()
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000)
@@ -51,13 +54,23 @@ export function App() {
       {state.status === 'ready' && (
         <>
           <CommandDeck events={state.payload.events} server={server} now={now} />
-          <TimelineGantt
-            events={state.payload.events}
-            window={viewWindow}
-            server={server}
-            now={now}
-            onSelect={() => {}}
-          />
+          {isDesktop ? (
+            <TimelineGantt
+              events={state.payload.events}
+              window={viewWindow}
+              server={server}
+              now={now}
+              onSelect={() => {}}
+            />
+          ) : (
+            <TimelineRiver
+              events={state.payload.events}
+              window={viewWindow}
+              server={server}
+              now={now}
+              onSelect={() => {}}
+            />
+          )}
         </>
       )}
     </main>
