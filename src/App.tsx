@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CommandDeck } from './components/CommandDeck'
+import { TimelineGantt } from './components/TimelineGantt'
 import { useTimeline } from './data/useTimeline'
 import { useServer } from './state/store'
 import { SERVER_OFFSET } from './types'
@@ -22,6 +23,11 @@ export function App() {
     return () => clearInterval(id)
   }, [])
 
+  const viewWindow = useMemo(
+    () => ({ from: now - 7 * 86_400_000, to: now + 45 * 86_400_000 }),
+    [now],
+  )
+
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
       <header className="flex items-center justify-between">
@@ -43,7 +49,16 @@ export function App() {
         <p className="text-urgent text-sm">Couldn't load timeline data. {state.error}</p>
       )}
       {state.status === 'ready' && (
-        <CommandDeck events={state.payload.events} server={server} now={now} />
+        <>
+          <CommandDeck events={state.payload.events} server={server} now={now} />
+          <TimelineGantt
+            events={state.payload.events}
+            window={viewWindow}
+            server={server}
+            now={now}
+            onSelect={() => {}}
+          />
+        </>
       )}
     </main>
   )
