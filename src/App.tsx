@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CommandDeck } from './components/CommandDeck'
+import { EventDetail } from './components/EventDetail'
 import { TimelineGantt } from './components/TimelineGantt'
 import { TimelineRiver } from './components/TimelineRiver'
 import { useTimeline } from './data/useTimeline'
+import { formatCountdown } from './lib/time'
 import { useServer } from './state/store'
 import { useIsDesktop } from './state/useIsDesktop'
 import { SERVER_OFFSET } from './types'
-import type { ServerRegion } from './types'
+import type { ServerRegion, TimelineEvent } from './types'
 
 const SERVER_LABEL: Record<ServerRegion, string> = {
   asia: 'Asia',
@@ -20,6 +22,7 @@ export function App() {
   const [server, setServer] = useServer()
   const [now, setNow] = useState(() => Date.now())
   const isDesktop = useIsDesktop()
+  const [selected, setSelected] = useState<TimelineEvent | null>(null)
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000)
@@ -60,7 +63,7 @@ export function App() {
               window={viewWindow}
               server={server}
               now={now}
-              onSelect={() => {}}
+              onSelect={setSelected}
             />
           ) : (
             <TimelineRiver
@@ -68,11 +71,24 @@ export function App() {
               window={viewWindow}
               server={server}
               now={now}
-              onSelect={() => {}}
+              onSelect={setSelected}
             />
           )}
         </>
       )}
+
+      <EventDetail event={selected} server={server} now={now} onClose={() => setSelected(null)} />
+
+      {state.status === 'ready' && (() => {
+        const ageHours = (now - Date.parse(state.payload.generatedAt)) / 3_600_000
+        return (
+          <p className={ageHours > 36 ? 'text-urgent text-[11px]' : 'text-dim text-[11px]'}>
+            {ageHours > 36
+              ? `Data is ${Math.floor(ageHours / 24)} days old — the ingest may have stopped.`
+              : `Updated ${formatCountdown(now - Date.parse(state.payload.generatedAt))} ago`}
+          </p>
+        )
+      })()}
     </main>
   )
 }
