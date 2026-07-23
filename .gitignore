@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vercel/
+
+# ingest response cache for `bun run ingest --offline`
+.cache/
+
+# paimon-moe clone used by research/rebuild_history.mjs — see README
+research/repo/
+
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
