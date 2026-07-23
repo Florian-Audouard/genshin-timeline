@@ -27,10 +27,10 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          if git diff --quiet public/data; then
+          git add -A public/data
+          if git diff --cached --quiet -- public/data; then
             echo 'no change'
           else
-            git add public/data
             git commit -m 'chore: refresh timeline data'
             git push
           fi
