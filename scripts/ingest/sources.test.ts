@@ -129,4 +129,46 @@ describe('fromCalendar', () => {
     expect(rows[0]!.featured).toEqual([{ name: 'Columbina', rarity: 5, element: 'electro' }])
     expect(rows[0]!.version).toBe('6.7')
   })
+
+  // The three tests below pin shapes taken from a live api.ennead.cc response
+  // on 2026-07-24. Each one failed before the fix, and the rarity case failed
+  // silently — a downgraded five-star renders as an ordinary banner.
+  it('reads a numeric rarity as a five-star', () => {
+    const rows = fromCalendar({
+      events: [], challenges: [],
+      banners: [{
+        name: 'Character Event Wish', version: '6.7',
+        start_time: 1782784800, end_time: 1784599140,
+        characters: [{ name: 'Columbina', rarity: 5, element: 'Hydro', icon: '' }],
+        weapons: [],
+      }],
+    })
+    expect(rows[0]!.featured).toEqual([{ name: 'Columbina', rarity: 5, element: 'hydro' }])
+  })
+
+  it('accepts weapon entries that carry no element field', () => {
+    const rows = fromCalendar({
+      events: [], challenges: [],
+      banners: [{
+        name: 'Weapon Event Wish', version: '6.7',
+        start_time: 1782784800, end_time: 1784599140,
+        characters: [],
+        weapons: [{ name: "Nocturne's Curtain Call", rarity: 5, icon: '' }],
+      }],
+    })
+    expect(rows[0]!.lane).toBe('weapon-wish')
+    expect(rows[0]!.featured).toEqual([{ name: "Nocturne's Curtain Call", rarity: 5 }])
+  })
+
+  it('accepts numeric unix timestamps', () => {
+    const rows = fromCalendar({
+      events: [{
+        id: 1, name: 'Sunny Summer Fontinalia',
+        start_time: 1782784800, end_time: 1786391999,
+      }],
+      banners: [], challenges: [],
+    })
+    expect(rows[0]!.start).toBe('2026-06-30 10:00:00')
+    expect(rows[0]!.end).toBe('2026-08-11 03:59:59')
+  })
 })

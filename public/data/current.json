@@ -1,0 +1,225 @@
+{
+  "generatedAt": "2026-07-23T22:07:02.331Z",
+  "events": [
+    {
+      "id": "sunny-summer-fontinalia@2026-06-30T10:00:00",
+      "name": "Sunny Summer Fontinalia",
+      "lane": "event",
+      "start": "2026-06-30 10:00:00",
+      "end": "2026-08-11 03:59:59",
+      "clock": "server",
+      "color": "#4cc2f1",
+      "description": "The Fontinalia Film Festival is here, and all kinds of wonderful films are being prepared with great excitement! Let's follow the summer breeze back to Fontaine and take a look. Who knows? We might even run into some old friends there!",
+      "source": "calendar",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2026/06/17/4c699b74ef0c77158a7f28e62ba2d7ec_6267956826869874359_transformed.jpg",
+      "url": "https://www.hoyolab.com/article/21789"
+    },
+    {
+      "id": "imaginarium-theater@2026-07-01T04:00:00",
+      "name": "Imaginarium Theater",
+      "lane": "theater",
+      "start": "2026-07-01 04:00:00",
+      "end": "2026-08-01 03:59:59",
+      "clock": "server",
+      "color": "#f0b73a",
+      "source": "calendar"
+    },
+    {
+      "id": "the-forge-realm-s-temper-endless-swarm@2026-07-01T07:00:00",
+      "name": "The Forge Realm's Temper: Endless Swarm",
+      "lane": "event",
+      "start": "2026-07-01 07:00:00",
+      "end": "2026-08-12 07:00:00",
+      "clock": "server",
+      "color": "#4cc2f1",
+      "source": "calendar",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2024/11/05/cf324597e5d687e26d86f297e59c9ebd_2179973999643752178.jpg",
+      "url": "https://www.hoyolab.com/article/20834"
+    },
+    {
+      "id": "stygian-onslaught@2026-07-08T10:00:00",
+      "name": "Stygian Onslaught",
+      "lane": "stygian",
+      "start": "2026-07-08 10:00:00",
+      "end": "2026-08-11 03:59:59",
+      "clock": "server",
+      "color": "#ff6640",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2025/10/23/40da7ab1ce17afd008e7a10c6ee6e67b_3372052251159312794_transformed.jpg",
+      "description": "A strange Ley Line Disturbance has once again appeared, this time in Liyue's Sal Terrae. You must breach the depths of this unpredictable Domain, for only by defeating powerful foes can the turmoil be quelled... Of course, where danger awaits, so too do extraordinary treasures...",
+      "source": "calendar",
+      "url": "https://www.hoyolab.com/article/21168"
+    },
+    {
+      "id": "abyssal-moon-spire@2026-07-16T04:00:00",
+      "name": "Abyssal Moon Spire",
+      "lane": "abyss",
+      "start": "2026-07-16 04:00:00",
+      "end": "2026-08-16 03:59:59",
+      "clock": "server",
+      "color": "#2a2f47",
+      "source": "calendar"
+    },
+    {
+      "id": "final-long-range-sightlines@2026-07-17T10:00:00",
+      "name": "Final Long-Range Sightlines",
+      "lane": "event",
+      "start": "2026-07-17 10:00:00",
+      "end": "2026-07-27 03:59:59",
+      "clock": "server",
+      "color": "#4cc2f1",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2026/06/18/db4a7ce2ccd4aa7fc565635c154f4d91_6167069495761070033_transformed.jpg",
+      "description": "Warriors from across Teyvat continue to exchange techniques and refine their tactics together. Recently, skilled shooters from the Knights of Favonius, Fontaine's Maison Gardiennage, and Natlan's Flower-Feather Clan assembled at Lumidouce Harbor for a distinctive joint exercise...",
+      "source": "calendar",
+      "url": "https://www.hoyolab.com/article/21756"
+    },
+    {
+      "id": "heated-battle-mode-automatic-artistry@2026-07-18T10:00:00",
+      "name": "Heated Battle Mode: Automatic Artistry",
+      "lane": "event",
+      "start": "2026-07-18 10:00:00",
+      "end": "2026-08-03 03:59:59",
+      "clock": "server",
+      "color": "#4cc2f1",
+      "description": "In The Cat's Tail, there will be a regularly scheduled event that uses special Heated Battle Mode rules.\\nRules for this period:\\nSelect characters specially dedicated to this mode to build a team and enhance them. Characters will automatically battle!",
+      "source": "calendar",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2025/10/10/a066dbf310d6c4a5e2c22b1f8324b732_1404755613436123246_transformed.jpg",
+      "url": "https://www.hoyolab.com/article/21368"
+    },
+    {
+      "id": "somnias-a-luna@2026-07-21T18:00:00",
+      "name": "Somnias a Luna",
+      "lane": "character-wish",
+      "start": "2026-07-21 18:00:00",
+      "end": "2026-08-11 14:59:59",
+      "clock": "absolute",
+      "color": "#b38df0",
+      "featured": [
+        {
+          "name": "Columbina",
+          "rarity": 5,
+          "element": "hydro"
+        },
+        {
+          "name": "Jahoda",
+          "rarity": 4,
+          "element": "anemo"
+        },
+        {
+          "name": "Ororon",
+          "rarity": 4,
+          "element": "electro"
+        },
+        {
+          "name": "Sethos",
+          "rarity": 4,
+          "element": "electro"
+        }
+      ],
+      "version": "6.7",
+      "source": "calendar",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2026/07/07/ed9a488eb3715b7de3a15015a6706c9d_4609553862097974572_transformed.jpg",
+      "url": "https://www.hoyolab.com/article/21757"
+    },
+    {
+      "id": "reign-of-serenity@2026-07-21T18:00:00",
+      "name": "Reign of Serenity",
+      "lane": "character-wish",
+      "start": "2026-07-21 18:00:00",
+      "end": "2026-08-11 14:59:59",
+      "clock": "absolute",
+      "color": "#b38df0",
+      "featured": [
+        {
+          "name": "Raiden Shogun",
+          "rarity": 5,
+          "element": "electro"
+        },
+        {
+          "name": "Jahoda",
+          "rarity": 4,
+          "element": "anemo"
+        },
+        {
+          "name": "Ororon",
+          "rarity": 4,
+          "element": "electro"
+        },
+        {
+          "name": "Sethos",
+          "rarity": 4,
+          "element": "electro"
+        }
+      ],
+      "version": "6.7",
+      "source": "calendar",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2026/07/07/feed9d723c2e7d5fb441dafee3c13d81_8435188004196210117_transformed.jpg",
+      "url": "https://www.hoyolab.com/article/21758"
+    },
+    {
+      "id": "epitome-invocation@2026-07-21T18:00:00",
+      "name": "Epitome Invocation",
+      "lane": "weapon-wish",
+      "start": "2026-07-21 18:00:00",
+      "end": "2026-08-11 14:59:59",
+      "clock": "absolute",
+      "color": "#d3bc8e",
+      "featured": [
+        {
+          "name": "Nocturne's Curtain Call",
+          "rarity": 5
+        },
+        {
+          "name": "Engulfing Lightning",
+          "rarity": 5
+        },
+        {
+          "name": "Waveriding Whirl",
+          "rarity": 4
+        },
+        {
+          "name": "Sacrificial Sword",
+          "rarity": 4
+        },
+        {
+          "name": "The Bell",
+          "rarity": 4
+        },
+        {
+          "name": "Favonius Warbow",
+          "rarity": 4
+        },
+        {
+          "name": "Favonius Lance",
+          "rarity": 4
+        }
+      ],
+      "version": "6.7",
+      "source": "calendar",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2026/07/07/4e3d27bc1355385ce167ae7eaa14a870_8724727087742838379_transformed.jpg",
+      "url": "https://www.hoyolab.com/article/21759"
+    },
+    {
+      "id": "dance-dance-easy-breezy-disco@2026-07-24T10:00:00",
+      "name": "Dance Dance Easy-Breezy Disco",
+      "lane": "event",
+      "start": "2026-07-24 10:00:00",
+      "end": "2026-08-03 03:59:59",
+      "clock": "server",
+      "color": "#4cc2f1",
+      "image": "https://sdk.hoyoverse.com/upload/ann/2026/07/07/043dcdecff5921bf4d2dc8e1f9594b5d_5395945412439377263_transformed.jpg",
+      "description": "A courier comes bearing good news — another party is about to kick off at Easybreeze Holiday Resort! This time, unexpected new guests will join the rhythmic ensemble and dance joyfully with us!",
+      "source": "announcement",
+      "url": "https://www.hoyolab.com/article/21760"
+    },
+    {
+      "id": "ley-line-overflow@2026-07-27T04:00:00",
+      "name": "Ley Line Overflow",
+      "lane": "leyline",
+      "start": "2026-07-27 04:00:00",
+      "end": "2026-08-03 03:59:59",
+      "clock": "server",
+      "color": "#a5c83b",
+      "source": "override"
+    }
+  ]
+}

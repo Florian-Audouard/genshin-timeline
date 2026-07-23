@@ -12,13 +12,24 @@ const ANN_QUERY =
   '?game=hk4e&game_biz=hk4e_global&lang=en&bundle_id=hk4e_global' +
   '&platform=pc&region=os_asia&level=60&uid=100000000'
 
-export type CalendarCharacter = { name: string; rarity: string; element: string; icon: string }
+/**
+ * Shapes verified against a live api.ennead.cc response on 2026-07-24. Three
+ * fields are looser than they look: `rarity` arrives as a number (comparing it
+ * to '5' silently downgrades every five-star), `element` is absent entirely on
+ * weapon entries, and the timestamps are numbers despite reading like strings.
+ */
+export type CalendarCharacter = {
+  name: string
+  rarity: string | number
+  element?: string
+  icon: string
+}
 export type CalendarEvent = {
-  id: number; name: string; description: string; image_url: string
-  start_time: string; end_time: string
+  id: number; name: string; description?: string; image_url?: string
+  start_time: string | number; end_time: string | number
 }
 export type CalendarBanner = {
-  name: string; version: string; start_time: string; end_time: string
+  name: string; version: string; start_time: string | number; end_time: string | number
   characters: CalendarCharacter[]; weapons: CalendarCharacter[]
 }
 export type CalendarPayload = {
@@ -96,13 +107,14 @@ export function clockFor(lane: LaneId): Clock {
     : 'server'
 }
 
-function toAsiaWallClock(unixSeconds: string): string {
+function toAsiaWallClock(unixSeconds: string | number): string {
   const n = Number(unixSeconds)
   if (!Number.isFinite(n) || n <= 0) return ''
   return new Date(n * 1000 + ASIA_OFFSET_MS).toISOString().slice(0, 19).replace('T', ' ')
 }
 
-function toElement(raw: string): Element | undefined {
+function toElement(raw: string | undefined): Element | undefined {
+  if (!raw) return undefined
   const e = raw.toLowerCase()
   const known: Element[] = ['pyro', 'hydro', 'anemo', 'electro', 'dendro', 'cryo', 'geo']
   return known.find((k) => k === e)
@@ -113,7 +125,7 @@ function roster(chars: CalendarCharacter[]): TimelineEvent['featured'] {
     const element = toElement(c.element)
     return {
       name: c.name,
-      rarity: c.rarity === '5' ? (5 as const) : (4 as const),
+      rarity: Number(c.rarity) === 5 ? (5 as const) : (4 as const),
       ...(element ? { element } : {}),
     }
   })
