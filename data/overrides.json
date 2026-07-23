@@ -1,0 +1,13 @@
+{
+  "_readme": "Hand-maintained rows layered on top of fetched sources. Only for events no source dates — see research/FINDINGS.md section 4. Ley Line Overflow has no standalone announcement while scheduled.",
+  "rows": [
+    {
+      "name": "Ley Line Overflow",
+      "lane": "leyline",
+      "start": "2026-07-27 04:00:00",
+      "end": "2026-08-03 03:59:59",
+      "clock": "server",
+      "color": "#a5c83b"
+    }
+  ]
+}
