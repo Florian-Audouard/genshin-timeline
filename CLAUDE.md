@@ -5,8 +5,9 @@
 
 ## Git workflow
 
-Every Claude session follows this flow: **work → branch → commit → push**.
+Every Claude session follows this flow: **pull → work → branch → commit → push**.
 
+- **Pull:** Always `git pull` before starting any work. A scheduled workflow pushes data-refresh commits to `main` on its own schedule, so the remote is often ahead — pulling first prevents diverged history and rejected pushes.
 - **Branch:** Start work on a new branch (never commit directly to `main`).
 - **Commit:** Commit the work — multiple commits within the session are fine.
 - **Push:** Push the branch, but only if a file was actually changed. If nothing changed, don't push.

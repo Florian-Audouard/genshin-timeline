@@ -24,19 +24,27 @@ html, body, #root {
   height: 100%;
 }
 
+/* The shell fills the viewport and panes scroll inside it — the page itself must
+   never produce a scrollbar of its own. */
+html, body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Themed horizontal scrollbar for the timeline track. */
+/* Themed scrollbar for the timeline track. */
 .timeline-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--color-gold) transparent;
 }
 .timeline-scroll::-webkit-scrollbar {
   height: 10px;
+  width: 10px;
 }
 .timeline-scroll::-webkit-scrollbar-track {
   background: var(--color-surface);
@@ -49,4 +57,12 @@ body {
 }
 .timeline-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--color-gold);
+}
+
+/* The status strip scrolls sideways without spending height on a scrollbar. */
+.deck-scroll {
+  scrollbar-width: none;
+}
+.deck-scroll::-webkit-scrollbar {
+  display: none;
 }

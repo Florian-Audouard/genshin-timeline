@@ -24,11 +24,9 @@ export type DayCell = {
  * Enumerate the days spanned by `win` as an axis, one cell per server-local day.
  *
  * Boundaries are computed at server-local midnight so gridlines line up with the
- * clock the events are scheduled against, not UTC. `gridShift` is the fraction of
- * a day between the window's left edge and the first midnight inside it — the
- * caller uses it to phase-align a repeating day grid to these cells.
+ * clock the events are scheduled against, not UTC.
  */
-export function dayAxis(win: Window, server: ServerRegion, now: number): { days: DayCell[]; gridShift: number } {
+export function dayAxis(win: Window, server: ServerRegion, now: number): DayCell[] {
   const offset = SERVER_OFFSET[server] * HOUR_MS
   const span = win.to - win.from
   const midnightOf = (t: number): number => {
@@ -58,8 +56,7 @@ export function dayAxis(win: Window, server: ServerRegion, now: number): { days:
     })
   }
 
-  const firstAfter = start < win.from ? start + DAY_MS : start
-  return { days, gridShift: (firstAfter - win.from) / DAY_MS }
+  return days
 }
 
 export type PositionedEvent = {

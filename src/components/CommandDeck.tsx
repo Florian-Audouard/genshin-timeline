@@ -11,6 +11,11 @@ function urgencyColor(msLeft: number): string {
   return 'text-dim'
 }
 
+/**
+ * One flat strip of status chips above the timeline. Everything lives on a single
+ * line — it scrolls sideways rather than growing taller, so the timeline keeps the
+ * rest of the viewport height.
+ */
 export function CommandDeck({ events, server, now }: Props) {
   const live = events.filter((e) => statusAt(e, now, server) === 'live')
 
@@ -27,48 +32,44 @@ export function CommandDeck({ events, server, now }: Props) {
     .map((e) => ({ e, until: startInstant(e, server) - now }))
     .sort((a, b) => a.until - b.until)[0]
 
-  return (
-    <section className="space-y-3">
-      {endingSoon.length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-3">
-          {endingSoon.map(({ e, left }) => (
-            <div key={e.id} className="bg-surface border-l-2 border-urgent p-3">
-              <div className={`text-[11px] tracking-[0.08em] uppercase ${urgencyColor(left)}`}>
-                Ends in {formatCountdown(left)}
-              </div>
-              <div className="mt-1 text-sm leading-snug">{e.name}</div>
-            </div>
-          ))}
-        </div>
-      )}
+  if (endingSoon.length === 0 && banners.length === 0 && !next) return null
 
-      {banners.length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {banners.map((e) => (
-            <div key={e.id} className="bg-surface flex items-center gap-3 rounded-xl p-3">
-              <span
-                className="size-9 shrink-0 rounded-full"
-                style={{ background: e.color }}
-                aria-hidden="true"
-              />
-              <div className="min-w-0">
-                <div className="truncate text-sm">
-                  {e.featured?.filter((f) => f.rarity === 5).map((f) => f.name).join(', ') || e.name}
-                </div>
-                <div className="text-dim truncate text-[11px]">
-                  {e.name}
-                  {e.end && ` · ${formatCountdown((endInstant(e, server) ?? now) - now)} left`}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  return (
+    <section className="deck-scroll flex shrink-0 items-center gap-2 overflow-x-auto px-4 pb-2 text-xs whitespace-nowrap">
+      {endingSoon.map(({ e, left }) => (
+        <span
+          key={e.id}
+          className="bg-surface border-urgent flex shrink-0 items-center gap-1.5 rounded-r border-l-2 px-2 py-1"
+          title={e.name}
+        >
+          <span className={`tabular-nums ${urgencyColor(left)}`}>{formatCountdown(left)}</span>
+          <span className="max-w-40 truncate">{e.name}</span>
+        </span>
+      ))}
+
+      {banners.map((e) => (
+        <span
+          key={e.id}
+          className="bg-surface flex shrink-0 items-center gap-1.5 rounded-full py-1 pr-2.5 pl-1"
+          title={e.name}
+        >
+          <span className="size-4 shrink-0 rounded-full" style={{ background: e.color }} aria-hidden="true" />
+          <span className="max-w-56 truncate">
+            {e.featured?.filter((f) => f.rarity === 5).map((f) => f.name).join(', ') || e.name}
+          </span>
+          {e.end && (
+            <span className="text-dim tabular-nums">
+              {formatCountdown((endInstant(e, server) ?? now) - now)}
+            </span>
+          )}
+        </span>
+      ))}
 
       {next && (
-        <div className="text-dim text-[11px]">
-          Next up: <span className="text-text">{next.e.name}</span> in {formatCountdown(next.until)}
-        </div>
+        <span className="text-dim shrink-0 py-1">
+          Next: <span className="text-text">{next.e.name}</span> in{' '}
+          <span className="tabular-nums">{formatCountdown(next.until)}</span>
+        </span>
       )}
     </section>
   )

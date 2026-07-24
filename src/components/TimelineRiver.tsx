@@ -1,7 +1,8 @@
+import { useEffect, useImperativeHandle, useRef } from 'react'
 import { endInstant, formatCountdown, startInstant, statusAt } from '../lib/time'
 import { inWindow } from '../lib/timeline'
 import type { Window } from '../lib/timeline'
-import type { ServerRegion, TimelineEvent } from '../types'
+import type { ServerRegion, TimelineEvent, TimelineHandle } from '../types'
 
 type Props = {
   events: TimelineEvent[]
@@ -9,6 +10,7 @@ type Props = {
   server: ServerRegion
   now: number
   onSelect: (e: TimelineEvent) => void
+  ref?: React.Ref<TimelineHandle>
 }
 
 function dayKey(instant: number): string {
@@ -21,7 +23,7 @@ function dayLabel(key: string, todayKey: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
-export function TimelineRiver({ events, window: win, server, now, onSelect }: Props) {
+export function TimelineRiver({ events, window: win, server, now, onSelect, ref }: Props) {
   const todayKey = dayKey(now)
   const visible = events.filter((e) => inWindow(e, win, server))
 
@@ -36,10 +38,21 @@ export function TimelineRiver({ events, window: win, server, now, onSelect }: Pr
 
   const days = [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1))
 
+  // Anchor for "today": the first group that isn't in the past. Years of history
+  // sit above it, so both the first paint and the Today button scroll to it.
+  const todayGroup = days.find(([key]) => key >= todayKey)?.[0]
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const scrollToNow = (behavior: ScrollBehavior): void =>
+    anchorRef.current?.scrollIntoView({ behavior, block: 'start' })
+  useImperativeHandle(ref, () => ({ scrollToNow: () => scrollToNow('smooth') }))
+  useEffect(() => {
+    scrollToNow('instant')
+  }, [])
+
   return (
-    <section className="space-y-4">
+    <section className="timeline-scroll h-full space-y-4 overflow-y-auto px-4 pb-4">
       {days.map(([key, dayEvents]) => (
-        <div key={key} className="flex gap-3">
+        <div key={key} ref={key === todayGroup ? anchorRef : undefined} className="flex gap-3">
           <div className="w-14 shrink-0 pt-1 text-right">
             <div className={key === todayKey ? 'text-urgent text-[11px]' : 'text-dim text-[11px]'}>
               {key === todayKey ? 'today' : ''}

@@ -66,3 +66,8 @@ export type TimelinePayload = {
   generatedAt: string
   events: TimelineEvent[]
 }
+
+/** What the shell can ask of whichever timeline view is mounted. */
+export type TimelineHandle = {
+  scrollToNow: () => void
+}
