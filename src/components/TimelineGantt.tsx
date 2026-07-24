@@ -179,7 +179,15 @@ export function TimelineGantt({
   }
   const drag = useRef<Drag | null>(null)
   const swallowClick = useRef(false)
-  const [grabbing, setGrabbing] = useState(false)
+
+  // Written straight to the node rather than held in state: re-rendering the
+  // whole track to swap a cursor cost ~240ms on press and ~115ms on release,
+  // which is most of what made dragging feel like it stuck. Nothing sets a
+  // `style` prop on the section, so React never clobbers this.
+  const setGrabbing = (on: boolean) => {
+    const el = scrollRef.current
+    if (el) el.style.cursor = on ? 'grabbing' : ''
+  }
 
   /** Let go of a flick and keep travelling, shedding speed until it's not worth it. */
   const startCoast = useCallback(
@@ -326,9 +334,7 @@ export function TimelineGantt({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onClickCapture={onClickCapture}
-      className={`timeline-scroll relative h-full touch-none overflow-x-auto overflow-y-auto select-none ${
-        grabbing ? 'cursor-grabbing' : 'cursor-grab'
-      }`}
+      className="timeline-scroll relative h-full cursor-grab touch-none overflow-x-auto overflow-y-auto select-none"
     >
       {/* w-max: without it the row is only as wide as the viewport and the sticky
           label column runs out of parent to stick to after one screen. */}
