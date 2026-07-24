@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { rgba, readableOn } from '../lib/color'
 import { cssUrl } from '../lib/css'
 import { dayAxis, laneRows } from '../lib/timeline'
@@ -16,15 +16,51 @@ type Props = {
 
 /** How many days fill the viewport, edge to edge (minus the sticky lane-label column). */
 const DAYS_PER_SCREEN = 40
-const LABEL_W = '9rem'
-const AXIS_H = 44
-const ROW_H = 48
-const ROW_GAP = 6
-const LANE_PAD_Y = 12
+const LABEL_W = 144
+const AXIS_H = 40
+/** Row heights the lanes are allowed to shrink/grow to when fitting the viewport. */
+const MIN_ROW_H = 22
+const MAX_ROW_H = 48
 
-/** Fixed pixel height of a lane block so the label and track columns stay aligned. */
-function laneHeight(rowCount: number): number {
-  return 1 + LANE_PAD_Y * 2 + rowCount * ROW_H + (rowCount - 1) * ROW_GAP
+type Metrics = { rowH: number; gap: number; pad: number }
+const ROOMY: Omit<Metrics, 'rowH'> = { gap: 6, pad: 8 }
+const TIGHT: Omit<Metrics, 'rowH'> = { gap: 3, pad: 4 }
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v))
+}
+
+/**
+ * Pick row height and lane padding so every lane fits the pane we were given.
+ * Tries roomy spacing first, falls back to tight spacing on short viewports, and
+ * only lets the pane scroll vertically once even MIN_ROW_H no longer fits.
+ */
+function fitMetrics(availH: number, laneCount: number, rowCount: number): Metrics {
+  if (!availH || !rowCount) return { rowH: MAX_ROW_H, ...ROOMY }
+  // The trailing -1 keeps a rounding remainder from tipping the pane into a
+  // vertical scrollbar it doesn't need.
+  const solve = ({ gap, pad }: Omit<Metrics, 'rowH'>): number =>
+    (availH - AXIS_H - laneCount * (1 + 2 * pad) - (rowCount - laneCount) * gap - 1) / rowCount
+
+  const roomy = solve(ROOMY)
+  if (roomy >= MIN_ROW_H) return { rowH: clamp(roomy, MIN_ROW_H, MAX_ROW_H), ...ROOMY }
+  return { rowH: clamp(solve(TIGHT), MIN_ROW_H, MAX_ROW_H), ...TIGHT }
+}
+
+/** Observe the pane's own box so day width and row height follow the real viewport. */
+function usePaneSize(ref: React.RefObject<HTMLElement | null>): { w: number; h: number } {
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      const box = entry!.contentRect
+      setSize({ w: box.width, h: box.height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return size
 }
 
 export function TimelineGantt({ events, window: win, server, now, onSelect }: Props) {
@@ -35,15 +71,18 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
 
   const scrollRef = useRef<HTMLElement>(null)
   const nowRef = useRef<HTMLDivElement>(null)
+  const { w: paneW, h: paneH } = usePaneSize(scrollRef)
 
   // Let the mouse wheel scroll the track sideways while hovering it. React's
   // onWheel is passive, so we attach a native non-passive listener to call
-  // preventDefault and stop the page from scrolling instead.
+  // preventDefault and stop the page from scrolling instead. When the lanes are
+  // taller than the pane, vertical wheel keeps its natural meaning.
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      if (el.scrollHeight > el.clientHeight) return
       if (el.scrollWidth <= el.clientWidth) return
       el.scrollLeft += e.deltaY
       e.preventDefault()
@@ -56,18 +95,23 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
   // than starting at the earliest (long-past) event.
   const didInitialScroll = useRef(false)
   useEffect(() => {
-    if (didInitialScroll.current || !nowRef.current) return
+    if (didInitialScroll.current || !nowRef.current || !paneW) return
     didInitialScroll.current = true
     nowRef.current.scrollIntoView({ inline: 'start', block: 'nearest' })
     scrollRef.current?.scrollBy({ left: -120 })
-  }, [])
+  }, [paneW])
 
   const visible = LANES.map((lane) => ({
     lane,
     rows: laneRows(events, lane.id, win, server),
   })).filter((l) => l.rows.length > 0)
 
-  const trackWidth = `calc(var(--day-w) * ${spanDays})`
+  const rowCount = visible.reduce((n, l) => n + l.rows.length, 0)
+  const { rowH, gap, pad } = fitMetrics(paneH, visible.length, rowCount)
+  const laneHeight = (rows: number): number => 1 + 2 * pad + rows * rowH + (rows - 1) * gap
+
+  const dayW = paneW ? (paneW - LABEL_W) / DAYS_PER_SCREEN : 0
+  const trackWidth = dayW * spanDays
   // A 1px vertical line at the start of every day cell, phase-aligned to real midnights.
   const dayGrid = {
     backgroundImage:
@@ -78,18 +122,18 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
   return (
     <section
       ref={scrollRef}
-      className="timeline-scroll relative left-1/2 w-screen -translate-x-1/2 overflow-x-auto"
-      style={{ ['--day-w' as string]: `calc((100vw - ${LABEL_W}) / ${DAYS_PER_SCREEN})` }}
+      className="timeline-scroll relative h-full overflow-x-auto overflow-y-auto"
+      style={{ ['--day-w' as string]: `${dayW}px` }}
     >
-      <div className="flex">
+      <div className="flex" style={{ visibility: dayW ? undefined : 'hidden' }}>
         {/* Lane labels — sticky so they stay pinned while the track scrolls sideways. */}
-        <div className="bg-bg sticky left-0 z-30 w-36 shrink-0">
+        <div className="bg-bg sticky left-0 z-30 shrink-0" style={{ width: LABEL_W }}>
           <div style={{ height: AXIS_H }} />
           {visible.map(({ lane, rows }) => (
             <div
               key={lane.id}
-              style={{ height: laneHeight(rows.length) }}
-              className="border-border text-dim border-t px-3 pt-3 text-xs"
+              style={{ height: laneHeight(rows.length), paddingTop: pad }}
+              className="border-border text-dim overflow-hidden border-t px-3 text-xs"
             >
               {lane.label}
             </div>
@@ -127,12 +171,12 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
                 style={{ left: `${d.leftPct}%`, width: 'var(--day-w)' }}
               >
                 {d.monthLabel && (
-                  <span className="text-gold absolute top-1.5 left-1 text-[10px] font-semibold tracking-wide whitespace-nowrap uppercase">
+                  <span className="text-gold absolute top-1 left-1 text-[10px] font-semibold tracking-wide whitespace-nowrap uppercase">
                     {d.monthLabel}
                   </span>
                 )}
                 <span
-                  className={`absolute bottom-1.5 left-0 w-full text-center text-[10px] tabular-nums ${
+                  className={`absolute bottom-1 left-0 w-full text-center text-[10px] tabular-nums ${
                     d.isToday ? 'text-urgent font-semibold' : 'text-dim'
                   }`}
                 >
@@ -145,11 +189,11 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
           {visible.map(({ lane, rows }) => (
             <div
               key={lane.id}
-              className="border-border relative flex flex-col gap-1.5 border-t py-3"
-              style={{ height: laneHeight(rows.length) }}
+              className="border-border relative flex flex-col border-t"
+              style={{ height: laneHeight(rows.length), paddingBlock: pad, gap }}
             >
               {rows.map((row, i) => (
-                <div key={i} className="relative h-12">
+                <div key={i} className="relative" style={{ height: rowH }}>
                   {row.map(({ event, leftPct, widthPct }) => {
                     // Constant lanes get their banner from LANE_STYLE (stamped in
                     // useTimeline); every other row carries its own ingest art.

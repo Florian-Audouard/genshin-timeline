@@ -37,7 +37,7 @@ export function TimelineRiver({ events, window: win, server, now, onSelect }: Pr
   const days = [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1))
 
   return (
-    <section className="space-y-4">
+    <section className="timeline-scroll h-full space-y-4 overflow-y-auto px-4 pb-4">
       {days.map(([key, dayEvents]) => (
         <div key={key} className="flex gap-3">
           <div className="w-14 shrink-0 pt-1 text-right">
