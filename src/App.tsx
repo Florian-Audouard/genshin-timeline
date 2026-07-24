@@ -5,6 +5,7 @@ import { TimelineGantt } from './components/TimelineGantt'
 import { TimelineRiver } from './components/TimelineRiver'
 import { useTimeline } from './data/useTimeline'
 import { formatCountdown } from './lib/time'
+import { dataExtent } from './lib/timeline'
 import { useServer } from './state/store'
 import { useIsDesktop } from './state/useIsDesktop'
 import { SERVER_OFFSET } from './types'
@@ -29,10 +30,17 @@ export function App() {
     return () => clearInterval(id)
   }, [])
 
-  const viewWindow = useMemo(
-    () => ({ from: now - 7 * 86_400_000, to: now + 45 * 86_400_000 }),
-    [now],
-  )
+  // Span the whole dataset (past and future) so nothing is clipped, padded a few
+  // days on each side and always including "now". Falls back to a window around
+  // now before the data has loaded.
+  const events = state.status === 'ready' ? state.payload.events : null
+  const viewWindow = useMemo(() => {
+    const pad = 3 * 86_400_000
+    const extent = events ? dataExtent(events, server) : null
+    const from = Math.min(extent?.from ?? now - 7 * 86_400_000, now) - pad
+    const to = Math.max(extent?.to ?? now + 45 * 86_400_000, now) + pad
+    return { from, to }
+  }, [events, server, now])
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">

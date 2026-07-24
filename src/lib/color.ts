@@ -19,6 +19,18 @@ export function readableOn(hex: string): '#000' | '#fff' {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 ? '#000' : '#fff'
 }
 
+/**
+ * `hex` as an `rgba()` string at the given alpha. Used to fade a bar's fill into
+ * its own hue — fading straight to the CSS `transparent` keyword interpolates
+ * through transparent-black and leaves a muddy grey seam.
+ */
+export function rgba(hex: string, alpha: number): string {
+  const rgb = parseHex(hex)
+  if (!rgb) return `rgba(0, 0, 0, ${alpha})`
+  const [r, g, b] = rgb
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 function parseHex(hex: string): [number, number, number] | null {
   const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim())
   if (!m) return null

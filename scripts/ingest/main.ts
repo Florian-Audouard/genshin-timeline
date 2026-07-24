@@ -1,13 +1,25 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fetchAll } from './sources'
 import { merge } from './merge'
+import { resolveColors } from './colors'
+import { stripLaneStyle } from '../../src/lib/lanes'
 import type { OverrideFile } from './merge'
-import type { TimelinePayload } from '../../src/types'
+import type { TimelineEvent, TimelinePayload } from '../../src/types'
 
 const OUT_DIR = 'public/data'
 const OUT_FILE = `${OUT_DIR}/current.json`
-const WINDOW_BACK_DAYS = 30
-const WINDOW_FORWARD_DAYS = 120
+
+/**
+ * Append-only upsert into the accumulating store: every live row is inserted or
+ * updated by id, and nothing is ever removed. This is what turns a live snapshot
+ * (which only reports the current ~30-day window) into a growing archive — once
+ * an event scrolls out of the feed, its last-known-good row stays here forever.
+ */
+function upsertById(store: TimelineEvent[], incoming: TimelineEvent[]): TimelineEvent[] {
+  const byId = new Map(store.map((e) => [e.id, e]))
+  for (const e of incoming) byId.set(e.id, e)
+  return [...byId.values()].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0))
+}
 
 async function readOverrides(): Promise<OverrideFile> {
   try {
@@ -15,6 +27,15 @@ async function readOverrides(): Promise<OverrideFile> {
     return { rows: parsed.rows ?? [] }
   } catch {
     return { rows: [] }
+  }
+}
+
+/** The last-written payload, used as the color cache. Absent on the first run. */
+async function readPreviousPayload(): Promise<TimelinePayload | null> {
+  try {
+    return JSON.parse(await readFile(OUT_FILE, 'utf8')) as TimelinePayload
+  } catch {
+    return null
   }
 }
 
@@ -26,37 +47,47 @@ async function main() {
   const raw = await fetchAll(offline)
   const { events, warnings } = merge(raw, await readOverrides())
 
-  const now = Date.now()
-  const from = new Date(now - WINDOW_BACK_DAYS * 86_400_000).toISOString().slice(0, 10)
-  const to = new Date(now + WINDOW_FORWARD_DAYS * 86_400_000).toISOString().slice(0, 10)
-  const windowed = events.filter((e) => e.start.slice(0, 10) <= to && (e.end ?? '9999') >= from)
+  // Derive each bar's fill from its banner art, reusing colors already resolved
+  // in the previous payload so unchanged images are never re-fetched.
+  const previous = await readPreviousPayload()
+  const { events: colored, warnings: colorWarnings } = await resolveColors(events, previous, {
+    offline,
+  })
+  warnings.push(...colorWarnings)
 
   for (const w of warnings) console.warn(`warn: ${w}`)
 
-  if (windowed.length === 0) {
-    console.error('error: merged 0 events — refusing to write a degraded dataset')
+  // Accumulate: fold this run's live rows into whatever the store already holds.
+  // A failed fetch can no longer wipe history — it just upserts nothing.
+  const store = upsertById(previous?.events ?? [], colored)
+
+  if (store.length === 0) {
+    console.error('error: store is empty — refusing to write a degraded dataset')
     process.exit(1)
   }
 
+  // Constant lanes never persist a color/image — their look is a lane constant
+  // (LANE_STYLE), reapplied at render. Strip only on the way out so the store
+  // above stays usable as the next run's color cache.
   const payload: TimelinePayload = {
     generatedAt: new Date().toISOString(),
-    events: windowed,
+    events: stripLaneStyle(store),
   }
   const json = `${JSON.stringify(payload, null, 2)}\n`
 
   if (dry) {
-    let previous = ''
-    try { previous = await readFile(OUT_FILE, 'utf8') } catch { previous = '' }
-    const changed = previous !== json
-    console.log(`${windowed.length} events, ${warnings.length} warnings`)
+    let prevJson = ''
+    try { prevJson = await readFile(OUT_FILE, 'utf8') } catch { prevJson = '' }
+    const changed = prevJson !== json
+    console.log(`${colored.length} live rows → ${store.length} in store, ${warnings.length} warnings`)
     console.log(changed ? 'would write: content changed' : 'would write: no change')
-    for (const e of windowed) console.log(`  ${e.lane.padEnd(16)} ${e.start}  ${e.name}`)
+    for (const e of colored) console.log(`  ${e.lane.padEnd(16)} ${e.start}  ${e.name}`)
     return
   }
 
   await mkdir(OUT_DIR, { recursive: true })
   await writeFile(OUT_FILE, json, 'utf8')
-  console.log(`wrote ${OUT_FILE} — ${windowed.length} events, ${warnings.length} warnings`)
+  console.log(`wrote ${OUT_FILE} — ${store.length} events (${colored.length} live), ${warnings.length} warnings`)
 }
 
 main().catch((err) => {

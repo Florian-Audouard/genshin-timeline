@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { LANE_STYLE } from '../../src/lib/lanes'
 import type { Clock, Element, LaneId, TimelineEvent } from '../../src/types'
 
 const CACHE_DIR = '.cache'
@@ -46,16 +47,19 @@ export type RawSources = {
   amber: AmberPayload
 }
 
-const DEFAULT_COLOR: Record<LaneId, string> = {
+export const DEFAULT_COLOR: Record<LaneId, string> = {
   'character-wish': '#b38df0',
   'weapon-wish': '#d3bc8e',
   chronicled: '#8fdfea',
   event: '#4cc2f1',
-  stygian: '#ff6640',
-  leyline: '#a5c83b',
-  abyss: '#2a2f47',
-  theater: '#f0b73a',
   battlepass: '#5fd7a6',
+  // The recurring challenges keep a single baked color+banner in LANE_STYLE and
+  // never store either per occurrence (see stripLaneStyle). These entries only
+  // matter mid-run, before the fields are stripped on write.
+  abyss: LANE_STYLE.abyss.color,
+  leyline: LANE_STYLE.leyline.color,
+  theater: LANE_STYLE.theater.color,
+  stygian: LANE_STYLE.stygian.color,
 }
 
 export function slugId(name: string, start: string): string {

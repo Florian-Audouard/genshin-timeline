@@ -29,3 +29,24 @@ body {
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
 }
+
+/* Themed horizontal scrollbar for the timeline track. */
+.timeline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gold) transparent;
+}
+.timeline-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.timeline-scroll::-webkit-scrollbar-track {
+  background: var(--color-surface);
+  border-radius: 999px;
+}
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-gold), var(--color-gold-deep));
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+}
+.timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold);
+}

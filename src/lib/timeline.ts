@@ -1,12 +1,89 @@
 import { endInstant, startInstant } from './time'
+import { SERVER_OFFSET } from '../types'
 import type { LaneId, ServerRegion, TimelineEvent } from '../types'
 
 export type Window = { from: number; to: number }
+
+const DAY_MS = 86_400_000
+const HOUR_MS = 3_600_000
+
+export type DayCell = {
+  /** Instant of this day's server-local midnight. */
+  instant: number
+  /** Left edge as a percentage of the window span (may fall outside 0–100 at the edges). */
+  leftPct: number
+  /** Day of the month, 1–31. */
+  day: number
+  /** Short month name — only set on the first day of a month (and the first cell), else null. */
+  monthLabel: string | null
+  isToday: boolean
+  isMonthStart: boolean
+}
+
+/**
+ * Enumerate the days spanned by `win` as an axis, one cell per server-local day.
+ *
+ * Boundaries are computed at server-local midnight so gridlines line up with the
+ * clock the events are scheduled against, not UTC. `gridShift` is the fraction of
+ * a day between the window's left edge and the first midnight inside it — the
+ * caller uses it to phase-align a repeating day grid to these cells.
+ */
+export function dayAxis(win: Window, server: ServerRegion, now: number): { days: DayCell[]; gridShift: number } {
+  const offset = SERVER_OFFSET[server] * HOUR_MS
+  const span = win.to - win.from
+  const midnightOf = (t: number): number => {
+    const d = new Date(t + offset)
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - offset
+  }
+
+  const todayMidnight = midnightOf(now)
+  const start = midnightOf(win.from)
+  const days: DayCell[] = []
+
+  for (let m = start; m < win.to; m += DAY_MS) {
+    const d = new Date(m + offset)
+    const day = d.getUTCDate()
+    const isMonthStart = day === 1
+    const monthLabel =
+      isMonthStart || days.length === 0
+        ? d.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' })
+        : null
+    days.push({
+      instant: m,
+      leftPct: ((m - win.from) / span) * 100,
+      day,
+      monthLabel,
+      isToday: m === todayMidnight,
+      isMonthStart,
+    })
+  }
+
+  const firstAfter = start < win.from ? start + DAY_MS : start
+  return { days, gridShift: (firstAfter - win.from) / DAY_MS }
+}
 
 export type PositionedEvent = {
   event: TimelineEvent
   leftPct: number
   widthPct: number
+}
+
+/**
+ * The full time span covered by `events` — earliest start to latest end — so the
+ * timeline can show every event, past and future, instead of a fixed window.
+ * Recurring events with no end contribute only their start. Returns null when
+ * there are no events.
+ */
+export function dataExtent(events: TimelineEvent[], server: ServerRegion): Window | null {
+  let from = Number.POSITIVE_INFINITY
+  let to = Number.NEGATIVE_INFINITY
+  for (const ev of events) {
+    const start = startInstant(ev, server)
+    const end = endInstant(ev, server) ?? start
+    if (start < from) from = start
+    if (end > to) to = end
+  }
+  return Number.isFinite(from) ? { from, to } : null
 }
 
 export function inWindow(ev: TimelineEvent, win: Window, server: ServerRegion): boolean {

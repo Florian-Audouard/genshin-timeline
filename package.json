@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ingest": "bun run scripts/ingest/main.ts"
+    "ingest": "bun run scripts/ingest/main.ts",
+    "build:history": "bun run scripts/ingest/build-history.ts"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -20,6 +21,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "sharp": "^0.35.3",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",

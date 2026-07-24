@@ -228,6 +228,32 @@ No `Access-Control-Allow-Origin` on the HoYo CDN — fine for `<img src>`, but y
 you ever need canvas or `fetch()`. Given `max-age=300` and that these are someone else's servers,
 mirroring the art into your own storage at ingest time is the right call.
 
+### Historical wish-banner promo art — game8
+
+The archive's wish banners (`paimon_banners.js`) carry no announcement art, unlike the live
+calendar. paimon.moe only has character portraits, not banner promo art — the wide key-visual with
+the roster and the banner name is what actually reads as "a banner" on the timeline. game8's
+[banner-history page](https://game8.co/games/Genshin-Impact/archives/603811) hosts exactly that:
+one wide promo image per banner at `img.game8.co/{id}/{hash}.png/show`. Verified hotlinkable
+(200, `image/png`, served from Amazon S3, no referer check).
+
+Scraped into `research/data/g8_banners.tsv` (raw dated rows) → reduced to `research/data/g8_banner_art.json`,
+a `{normalisedName → {name, image}}` map keyed by `normKey(name)`, both consumed by `build-history.ts`
+and joined in `history.ts` (`resolveBannerArt`). Names alone cannot join the weapon lane — paimon
+names every weapon banner "Epitome Invocation" while game8 uses thematic names or literal
+"Phase 1"/"Phase 2" labels — so the join works per *launch window* (same start date): name-match
+what it can, then pair the single leftover row with the single artless banner. Phase-labelled rows
+were visually verified to be Epitome Invocation promo art and may only ever pair with the weapon
+lane. A few scraped start dates carried the wrong year (spans like "2025-03-17 → 2026-04-07" for a
+three-week run); `parseG8Tsv` repairs them. All 71 resulting joins agree with the paimon end dates
+to within 2 days, and spot-checked images match the banner's featured roster.
+
+Coverage after the window join: character-wish 91/103, chronicled 6/7, weapon-wish **71**/102 —
+the remaining weapon runs predate game8's table (first row 2021-05-18) or sit in windows game8
+never listed. The 8 missing character banners (Sparkling Steps, Secretum Secretorum, Dance of
+Lanterns, Born of Ocean Swell, Viridescent Vigil, Auric Blaze, Somnias a Luna [current, has live
+art], To the Looking-Glass the Mademoiselle Said) still render as plain colour bars.
+
 ---
 
 ## 7. Recommended architecture
