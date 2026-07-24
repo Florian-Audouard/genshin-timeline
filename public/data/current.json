@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T01:44:41.582Z",
+  "generatedAt": "2026-07-24T08:06:19.853Z",
   "events": [
     {
       "id": "sunny-summer-fontinalia@2026-06-30T10:00:00",
@@ -208,7 +208,7 @@
       "color": "#4cc2f1",
       "image": "https://sdk.hoyoverse.com/upload/ann/2026/07/07/043dcdecff5921bf4d2dc8e1f9594b5d_5395945412439377263_transformed.jpg",
       "description": "A courier comes bearing good news — another party is about to kick off at Easybreeze Holiday Resort! This time, unexpected new guests will join the rhythmic ensemble and dance joyfully with us!",
-      "source": "announcement",
+      "source": "calendar",
       "url": "https://www.hoyolab.com/article/21760"
     },
     {
