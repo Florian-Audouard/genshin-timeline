@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CommandDeck } from './components/CommandDeck'
 import { EventDetail } from './components/EventDetail'
-import { TimelineGantt } from './components/TimelineGantt'
+import { DAYS, TimelineGantt, clampDays } from './components/TimelineGantt'
 import { TimelineRiver } from './components/TimelineRiver'
 import { useTimeline } from './data/useTimeline'
 import { formatCountdown } from './lib/time'
@@ -25,6 +25,11 @@ export function App() {
   const isDesktop = useIsDesktop()
   const [selected, setSelected] = useState<TimelineEvent | null>(null)
   const timeline = useRef<TimelineHandle>(null)
+
+  // How many days the Gantt fits across the viewport. Zoom gestures arrive as a
+  // multiplier so the view can anchor the scroll position before we change it.
+  const [daysPerScreen, setDaysPerScreen] = useState(DAYS.default)
+  const zoom = useCallback((factor: number) => setDaysPerScreen((d) => clampDays(d * factor)), [])
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000)
@@ -70,6 +75,29 @@ export function App() {
           </span>
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          {state.status === 'ready' && isDesktop && (
+            <div className="bg-surface border-border text-dim flex items-center rounded-md border text-xs">
+              <button
+                type="button"
+                onClick={() => timeline.current?.zoomBy?.(1 / DAYS.step)}
+                disabled={daysPerScreen <= DAYS.min}
+                className="hover:text-gold px-2 py-1 disabled:opacity-30"
+                aria-label="Show fewer days"
+              >
+                −
+              </button>
+              <span className="tabular-nums">{Math.round(daysPerScreen)} days</span>
+              <button
+                type="button"
+                onClick={() => timeline.current?.zoomBy?.(DAYS.step)}
+                disabled={daysPerScreen >= DAYS.max}
+                className="hover:text-gold px-2 py-1 disabled:opacity-30"
+                aria-label="Show more days"
+              >
+                +
+              </button>
+            </div>
+          )}
           {state.status === 'ready' && (
             <button
               type="button"
@@ -107,6 +135,8 @@ export function App() {
                 window={viewWindow}
                 server={server}
                 now={now}
+                daysPerScreen={daysPerScreen}
+                onZoom={zoom}
                 onSelect={setSelected}
               />
             ) : (

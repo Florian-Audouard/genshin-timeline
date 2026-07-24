@@ -70,4 +70,6 @@ export type TimelinePayload = {
 /** What the shell can ask of whichever timeline view is mounted. */
 export type TimelineHandle = {
   scrollToNow: () => void
+  /** Gantt only — the river view has no zoom, so the shell hides its controls. */
+  zoomBy?: (factor: number) => void
 }
