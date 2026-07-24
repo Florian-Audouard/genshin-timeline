@@ -11,12 +11,30 @@ type Props = {
   window: Window
   server: ServerRegion
   now: number
+  /** How many days fill the viewport, edge to edge (minus the sticky lane-label column). */
+  daysPerScreen: number
+  /** Multiply the current day count by `factor`; the caller clamps and stores it. */
+  onZoom: (factor: number) => void
   onSelect: (e: TimelineEvent) => void
   ref?: React.Ref<TimelineHandle>
 }
 
-/** How many days fill the viewport, edge to edge (minus the sticky lane-label column). */
-const DAYS_PER_SCREEN = 40
+/**
+ * Zoom limits, in days across the viewport. Below `min` a single banner fills the
+ * screen; above `max` bars collapse onto their 6px floor and stop being readable.
+ */
+export const DAYS = { min: 10, max: 365, default: 40, step: 1.5 }
+
+/** Days per wheel notch, as a multiplier: deltaY ≈ ±100 on a mouse → ≈ 1.16×. */
+const WHEEL_ZOOM = 0.0015
+/** Past this much pointer travel, a press is a pan rather than a click on a bar. */
+const DRAG_SLOP = 4
+/** Coasting: velocity retained per millisecond, and the speed we give up at. */
+const FRICTION = 0.996
+const MIN_SPEED = 0.02
+/** Longest frame we'll integrate over, so a stalled tab doesn't lurch on resume. */
+const MAX_FRAME_MS = 50
+
 const LABEL_W = 144
 const AXIS_H = 40
 /** Row heights the lanes are allowed to shrink/grow to when fitting the viewport. */
@@ -29,6 +47,10 @@ const TIGHT: Omit<Metrics, 'rowH'> = { gap: 3, pad: 4 }
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v))
+}
+
+export function clampDays(days: number): number {
+  return clamp(days, DAYS.min, DAYS.max)
 }
 
 /**
@@ -64,7 +86,16 @@ function usePaneSize(ref: React.RefObject<HTMLElement | null>): { w: number; h: 
   return size
 }
 
-export function TimelineGantt({ events, window: win, server, now, onSelect, ref }: Props) {
+export function TimelineGantt({
+  events,
+  window: win,
+  server,
+  now,
+  daysPerScreen,
+  onZoom,
+  onSelect,
+  ref,
+}: Props) {
   const span = win.to - win.from
   const spanDays = span / 86_400_000
   const nowPct = ((now - win.from) / span) * 100
@@ -73,26 +104,192 @@ export function TimelineGantt({ events, window: win, server, now, onSelect, ref 
   const scrollRef = useRef<HTMLElement>(null)
   const { w: paneW, h: paneH } = usePaneSize(scrollRef)
 
-  // Let the mouse wheel scroll the track sideways while hovering it. React's
-  // onWheel is passive, so we attach a native non-passive listener to call
-  // preventDefault and stop the page from scrolling instead. When the lanes are
-  // taller than the pane, vertical wheel keeps its natural meaning.
+  const dayW = paneW ? (paneW - LABEL_W) / daysPerScreen : 0
+  const trackWidth = dayW * spanDays
+
+  // Momentum left over from a flick. Anything that deliberately repositions the
+  // pane — zoom, Today — cancels it first, or it would fight for the scroll.
+  const coast = useRef(0)
+  const stopCoast = useCallback(() => {
+    if (coast.current) cancelAnimationFrame(coast.current)
+    coast.current = 0
+  }, [])
+  useEffect(() => stopCoast, [stopCoast])
+
+  // Zooming rewrites the track width underneath a scroll position that meant
+  // something, so we record which instant sat under a given screen x and put it
+  // back once the new width has been laid out. `lastTrackWidth` is what the
+  // fraction was measured against — by the time the effect runs, `trackWidth`
+  // is already the new one.
+  const anchor = useRef<{ fraction: number; offsetPx: number } | null>(null)
+  const lastTrackWidth = useRef(0)
+
+  const zoomAround = useCallback(
+    (factor: number, clientX?: number) => {
+      const el = scrollRef.current
+      if (!el || !lastTrackWidth.current) return
+      // A coast still in flight would drag the anchored instant back off the cursor.
+      stopCoast()
+      const viewW = el.clientWidth - LABEL_W
+      // Where in the track's visible strip to pin. The −/+ buttons pass no
+      // pointer and so zoom around the middle of what you're already looking at.
+      const offsetPx =
+        clientX == null
+          ? viewW / 2
+          : clamp(clientX - el.getBoundingClientRect().left - LABEL_W, 0, viewW)
+      anchor.current = { fraction: (el.scrollLeft + offsetPx) / lastTrackWidth.current, offsetPx }
+      onZoom(factor)
+    },
+    [onZoom, stopCoast],
+  )
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || !trackWidth) return
+    const a = anchor.current
+    if (a) {
+      el.scrollLeft = Math.max(0, a.fraction * trackWidth - a.offsetPx)
+      anchor.current = null
+    }
+    lastTrackWidth.current = trackWidth
+  }, [trackWidth])
+
+  // Wheel zooms. React's onWheel is passive, so we attach a native listener to
+  // call preventDefault and stop the page from scrolling instead. Sideways
+  // intent — trackpad two-finger swipe, shift+wheel — falls through to the
+  // pane's own horizontal scrolling.
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
-      if (el.scrollHeight > el.clientHeight) return
-      if (el.scrollWidth <= el.clientWidth) return
-      el.scrollLeft += e.deltaY
       e.preventDefault()
+      zoomAround(Math.exp(e.deltaY * WHEEL_ZOOM), e.clientX)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [])
+  }, [zoomAround])
 
-  const dayW = paneW ? (paneW - LABEL_W) / DAYS_PER_SCREEN : 0
-  const trackWidth = dayW * spanDays
+  // Drag pans both axes. Nothing happens until the pointer clears DRAG_SLOP, so
+  // a plain press still reaches the bar underneath and opens its detail panel.
+  type Drag = {
+    x: number; y: number; left: number; top: number; moved: boolean
+    // Previous sample plus a smoothed velocity, in px/ms, for the throw.
+    px: number; py: number; pt: number; vx: number; vy: number
+  }
+  const drag = useRef<Drag | null>(null)
+  const swallowClick = useRef(false)
+
+  // Written straight to the node rather than held in state: re-rendering the
+  // whole track to swap a cursor cost ~240ms on press and ~115ms on release,
+  // which is most of what made dragging feel like it stuck. Nothing sets a
+  // `style` prop on the section, so React never clobbers this.
+  const setGrabbing = (on: boolean) => {
+    const el = scrollRef.current
+    if (el) el.style.cursor = on ? 'grabbing' : ''
+  }
+
+  /** Let go of a flick and keep travelling, shedding speed until it's not worth it. */
+  const startCoast = useCallback(
+    (vx0: number, vy0: number) => {
+      let vx = vx0
+      let vy = vy0
+      // Seeded from the first frame, not from now: a rAF timestamp is the frame's
+      // start, which can predate a clock read taken while handling pointerup.
+      let prev = 0
+      const step = (t: number) => {
+        const el = scrollRef.current
+        if (!el) return
+        if (!prev) {
+          prev = t
+          coast.current = requestAnimationFrame(step)
+          return
+        }
+        const dt = Math.min(t - prev, MAX_FRAME_MS)
+        prev = t
+        const wasLeft = el.scrollLeft
+        const wasTop = el.scrollTop
+        el.scrollLeft += vx * dt
+        el.scrollTop += vy * dt
+        const decay = FRICTION ** dt
+        vx *= decay
+        vy *= decay
+        // Give up once we've slowed to a crawl, or when an edge ate the whole
+        // delta and we'd otherwise burn frames pushing against it.
+        const budged = el.scrollLeft !== wasLeft || el.scrollTop !== wasTop
+        coast.current = budged && Math.hypot(vx, vy) >= MIN_SPEED ? requestAnimationFrame(step) : 0
+      }
+      coast.current = requestAnimationFrame(step)
+    },
+    [],
+  )
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    const el = scrollRef.current
+    if (e.button !== 0 || !el) return
+    stopCoast()
+    swallowClick.current = false
+    drag.current = {
+      x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop, moved: false,
+      px: e.clientX, py: e.clientY, pt: e.timeStamp, vx: 0, vy: 0,
+    }
+  }
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current
+    const el = scrollRef.current
+    if (!d || !el) return
+    const dx = e.clientX - d.x
+    const dy = e.clientY - d.y
+    if (!d.moved) {
+      if (Math.hypot(dx, dy) < DRAG_SLOP) return
+      d.moved = true
+      setGrabbing(true)
+      // Capture so a fast drag that leaves the pane keeps panning it. Throws if
+      // the pointer went away between press and move; the pan works regardless.
+      try {
+        el.setPointerCapture(e.pointerId)
+      } catch {
+        // ignore
+      }
+    }
+    el.scrollLeft = d.left - dx
+    el.scrollTop = d.top - dy
+
+    // Smooth the per-sample velocity so one jittery move can't define the throw,
+    // while a pause before release still decays it to a stop.
+    const dt = e.timeStamp - d.pt
+    if (dt > 0) {
+      const weight = Math.min(1, dt / 25)
+      d.vx += ((e.clientX - d.px) / dt - d.vx) * weight
+      d.vy += ((e.clientY - d.py) / dt - d.vy) * weight
+      d.px = e.clientX
+      d.py = e.clientY
+      d.pt = e.timeStamp
+    }
+  }
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = drag.current
+    drag.current = null
+    if (!d?.moved) return
+    if (scrollRef.current?.hasPointerCapture(e.pointerId)) {
+      scrollRef.current.releasePointerCapture(e.pointerId)
+    }
+    setGrabbing(false)
+    // The click that follows this pointerup would open whichever bar the drag
+    // happened to finish on. Swallow exactly that one.
+    swallowClick.current = true
+    // Content travels opposite the pointer, so the throw does too.
+    if (Math.hypot(d.vx, d.vy) >= MIN_SPEED) startCoast(-d.vx, -d.vy)
+  }
+
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (!swallowClick.current) return
+    swallowClick.current = false
+    e.preventDefault()
+    e.stopPropagation()
+  }
 
   // Put "now" a third of the way into the track, so recent history stays visible
   // alongside what's coming. Used for the first paint and by the "Today" button.
@@ -100,12 +297,17 @@ export function TimelineGantt({ events, window: win, server, now, onSelect, ref 
     (behavior: ScrollBehavior) => {
       const el = scrollRef.current
       if (!el || !trackWidth) return
+      stopCoast()
       const left = (nowPct / 100) * trackWidth - (el.clientWidth - LABEL_W) / 3
       el.scrollTo({ left: Math.max(0, left), behavior })
     },
-    [nowPct, trackWidth],
+    [nowPct, trackWidth, stopCoast],
   )
-  useImperativeHandle(ref, () => ({ scrollToNow: () => scrollToNow('smooth') }), [scrollToNow])
+  useImperativeHandle(
+    ref,
+    () => ({ scrollToNow: () => scrollToNow('smooth'), zoomBy: (f: number) => zoomAround(f) }),
+    [scrollToNow, zoomAround],
+  )
 
   // On first render, jump to now rather than starting at the earliest (long-past) event.
   const didInitialScroll = useRef(false)
@@ -127,7 +329,12 @@ export function TimelineGantt({ events, window: win, server, now, onSelect, ref 
   return (
     <section
       ref={scrollRef}
-      className="timeline-scroll relative h-full overflow-x-auto overflow-y-auto"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onClickCapture={onClickCapture}
+      className="timeline-scroll relative h-full cursor-grab touch-none overflow-x-auto overflow-y-auto select-none"
     >
       {/* w-max: without it the row is only as wide as the viewport and the sticky
           label column runs out of parent to stick to after one screen. */}
@@ -205,7 +412,7 @@ export function TimelineGantt({ events, window: win, server, now, onSelect, ref 
                       <button
                         key={event.id}
                         onClick={() => onSelect(event)}
-                        className="group @container absolute inset-y-0 overflow-hidden rounded-lg text-left ring-1 ring-white/10 transition hover:brightness-110 hover:ring-white/25"
+                        className="group @container absolute inset-y-0 cursor-pointer overflow-hidden rounded-lg text-left ring-1 ring-white/10 transition hover:brightness-110 hover:ring-white/25"
                         style={{
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
