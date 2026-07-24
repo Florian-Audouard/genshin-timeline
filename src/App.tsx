@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CommandDeck } from './components/CommandDeck'
 import { EventDetail } from './components/EventDetail'
 import { TimelineGantt } from './components/TimelineGantt'
@@ -9,7 +9,7 @@ import { dataExtent } from './lib/timeline'
 import { useServer } from './state/store'
 import { useIsDesktop } from './state/useIsDesktop'
 import { SERVER_OFFSET } from './types'
-import type { ServerRegion, TimelineEvent } from './types'
+import type { ServerRegion, TimelineEvent, TimelineHandle } from './types'
 
 const SERVER_LABEL: Record<ServerRegion, string> = {
   asia: 'Asia',
@@ -24,6 +24,7 @@ export function App() {
   const [now, setNow] = useState(() => Date.now())
   const isDesktop = useIsDesktop()
   const [selected, setSelected] = useState<TimelineEvent | null>(null)
+  const timeline = useRef<TimelineHandle>(null)
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000)
@@ -68,16 +69,27 @@ export function App() {
             {freshness.text}
           </span>
         )}
-        <select
-          value={server}
-          onChange={(e) => setServer(e.target.value as ServerRegion)}
-          className="bg-surface border-border text-dim ml-auto shrink-0 rounded-md border px-2 py-1 text-xs"
-          aria-label="Server region"
-        >
-          {(Object.keys(SERVER_OFFSET) as ServerRegion[]).map((r) => (
-            <option key={r} value={r}>{SERVER_LABEL[r]}</option>
-          ))}
-        </select>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {state.status === 'ready' && (
+            <button
+              type="button"
+              onClick={() => timeline.current?.scrollToNow()}
+              className="bg-surface border-border text-gold hover:border-gold rounded-md border px-2 py-1 text-xs"
+            >
+              Today
+            </button>
+          )}
+          <select
+            value={server}
+            onChange={(e) => setServer(e.target.value as ServerRegion)}
+            className="bg-surface border-border text-dim rounded-md border px-2 py-1 text-xs"
+            aria-label="Server region"
+          >
+            {(Object.keys(SERVER_OFFSET) as ServerRegion[]).map((r) => (
+              <option key={r} value={r}>{SERVER_LABEL[r]}</option>
+            ))}
+          </select>
+        </div>
       </header>
 
       {state.status === 'loading' && <p className="text-dim px-4 text-sm">Loading…</p>}
@@ -90,6 +102,7 @@ export function App() {
           <div className="min-h-0 flex-1">
             {isDesktop ? (
               <TimelineGantt
+                ref={timeline}
                 events={state.payload.events}
                 window={viewWindow}
                 server={server}
@@ -98,6 +111,7 @@ export function App() {
               />
             ) : (
               <TimelineRiver
+                ref={timeline}
                 events={state.payload.events}
                 window={viewWindow}
                 server={server}

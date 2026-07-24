@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { rgba, readableOn } from '../lib/color'
 import { cssUrl } from '../lib/css'
 import { dayAxis, laneRows } from '../lib/timeline'
 import type { Window } from '../lib/timeline'
 import { LANES } from '../types'
-import type { ServerRegion, TimelineEvent } from '../types'
+import type { ServerRegion, TimelineEvent, TimelineHandle } from '../types'
 
 type Props = {
   events: TimelineEvent[]
@@ -12,6 +12,7 @@ type Props = {
   server: ServerRegion
   now: number
   onSelect: (e: TimelineEvent) => void
+  ref?: React.Ref<TimelineHandle>
 }
 
 /** How many days fill the viewport, edge to edge (minus the sticky lane-label column). */
@@ -63,14 +64,13 @@ function usePaneSize(ref: React.RefObject<HTMLElement | null>): { w: number; h: 
   return size
 }
 
-export function TimelineGantt({ events, window: win, server, now, onSelect }: Props) {
+export function TimelineGantt({ events, window: win, server, now, onSelect, ref }: Props) {
   const span = win.to - win.from
   const spanDays = span / 86_400_000
   const nowPct = ((now - win.from) / span) * 100
-  const { days, gridShift } = dayAxis(win, server, now)
+  const days = dayAxis(win, server, now)
 
   const scrollRef = useRef<HTMLElement>(null)
-  const nowRef = useRef<HTMLDivElement>(null)
   const { w: paneW, h: paneH } = usePaneSize(scrollRef)
 
   // Let the mouse wheel scroll the track sideways while hovering it. React's
@@ -91,15 +91,29 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  // On first render, scroll so "now" sits near the left of the viewport rather
-  // than starting at the earliest (long-past) event.
+  const dayW = paneW ? (paneW - LABEL_W) / DAYS_PER_SCREEN : 0
+  const trackWidth = dayW * spanDays
+
+  // Put "now" a third of the way into the track, so recent history stays visible
+  // alongside what's coming. Used for the first paint and by the "Today" button.
+  const scrollToNow = useCallback(
+    (behavior: ScrollBehavior) => {
+      const el = scrollRef.current
+      if (!el || !trackWidth) return
+      const left = (nowPct / 100) * trackWidth - (el.clientWidth - LABEL_W) / 3
+      el.scrollTo({ left: Math.max(0, left), behavior })
+    },
+    [nowPct, trackWidth],
+  )
+  useImperativeHandle(ref, () => ({ scrollToNow: () => scrollToNow('smooth') }), [scrollToNow])
+
+  // On first render, jump to now rather than starting at the earliest (long-past) event.
   const didInitialScroll = useRef(false)
   useEffect(() => {
-    if (didInitialScroll.current || !nowRef.current || !paneW) return
+    if (didInitialScroll.current || !trackWidth) return
     didInitialScroll.current = true
-    nowRef.current.scrollIntoView({ inline: 'start', block: 'nearest' })
-    scrollRef.current?.scrollBy({ left: -120 })
-  }, [paneW])
+    scrollToNow('instant')
+  }, [trackWidth, scrollToNow])
 
   const visible = LANES.map((lane) => ({
     lane,
@@ -110,22 +124,14 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
   const { rowH, gap, pad } = fitMetrics(paneH, visible.length, rowCount)
   const laneHeight = (rows: number): number => 1 + 2 * pad + rows * rowH + (rows - 1) * gap
 
-  const dayW = paneW ? (paneW - LABEL_W) / DAYS_PER_SCREEN : 0
-  const trackWidth = dayW * spanDays
-  // A 1px vertical line at the start of every day cell, phase-aligned to real midnights.
-  const dayGrid = {
-    backgroundImage:
-      'repeating-linear-gradient(to right, var(--color-border) 0 1px, transparent 1px var(--day-w))',
-    backgroundPositionX: `calc(var(--day-w) * ${gridShift})`,
-  }
-
   return (
     <section
       ref={scrollRef}
       className="timeline-scroll relative h-full overflow-x-auto overflow-y-auto"
-      style={{ ['--day-w' as string]: `${dayW}px` }}
     >
-      <div className="flex" style={{ visibility: dayW ? undefined : 'hidden' }}>
+      {/* w-max: without it the row is only as wide as the viewport and the sticky
+          label column runs out of parent to stick to after one screen. */}
+      <div className="flex w-max" style={{ visibility: dayW ? undefined : 'hidden' }}>
         {/* Lane labels — sticky so they stay pinned while the track scrolls sideways. */}
         <div className="bg-bg sticky left-0 z-30 shrink-0" style={{ width: LABEL_W }}>
           <div style={{ height: AXIS_H }} />
@@ -142,49 +148,46 @@ export function TimelineGantt({ events, window: win, server, now, onSelect }: Pr
 
         {/* Scrolling track. Its width sets the positioning context for the % bars. */}
         <div className="relative shrink-0" style={{ width: trackWidth }}>
-          <div className="pointer-events-none absolute inset-0" style={dayGrid} aria-hidden="true" />
-          {days
-            .filter((d) => d.isMonthStart && d.leftPct >= 0)
-            .map((d) => (
+          {/* Day axis and grid in one pass: a full-height column per day, carrying a
+              hairline on its midnight (brighter on month starts) and its date label
+              in the axis strip. Left edges snap to whole pixels — a percentage
+              position blurs every line into two half-lit ones. */}
+          <div className="pointer-events-none absolute inset-0">
+            {days.map((d) => (
               <div
                 key={d.instant}
-                className="bg-dim/40 pointer-events-none absolute top-0 bottom-0 w-px"
-                style={{ left: `${d.leftPct}%` }}
-                aria-hidden="true"
-              />
+                className={`absolute top-0 bottom-0 border-l ${
+                  d.isMonthStart ? 'border-dim/40' : 'border-border'
+                }`}
+                style={{ left: Math.round((d.leftPct / 100) * trackWidth), width: dayW }}
+              >
+                <div className="relative" style={{ height: AXIS_H }}>
+                  {d.monthLabel && (
+                    <span className="text-gold absolute top-1 left-1 text-[10px] font-semibold tracking-wide whitespace-nowrap uppercase">
+                      {d.monthLabel}
+                    </span>
+                  )}
+                  <span
+                    className={`absolute bottom-1 left-0 w-full text-center text-[10px] tabular-nums ${
+                      d.isToday ? 'text-urgent font-semibold' : 'text-dim'
+                    }`}
+                  >
+                    {d.day}
+                  </span>
+                </div>
+              </div>
             ))}
+          </div>
           {nowPct >= 0 && nowPct <= 100 && (
             <div
-              ref={nowRef}
               className="bg-urgent pointer-events-none absolute top-0 bottom-0 z-20 w-px"
               style={{ left: `${nowPct}%` }}
               aria-hidden="true"
             />
           )}
 
-          {/* Day axis: a number under every gridline, the month named once per month. */}
-          <div className="relative" style={{ height: AXIS_H }}>
-            {days.map((d) => (
-              <div
-                key={d.instant}
-                className="absolute top-0 bottom-0"
-                style={{ left: `${d.leftPct}%`, width: 'var(--day-w)' }}
-              >
-                {d.monthLabel && (
-                  <span className="text-gold absolute top-1 left-1 text-[10px] font-semibold tracking-wide whitespace-nowrap uppercase">
-                    {d.monthLabel}
-                  </span>
-                )}
-                <span
-                  className={`absolute bottom-1 left-0 w-full text-center text-[10px] tabular-nums ${
-                    d.isToday ? 'text-urgent font-semibold' : 'text-dim'
-                  }`}
-                >
-                  {d.day}
-                </span>
-              </div>
-            ))}
-          </div>
+          {/* Reserves the height the (absolutely placed) day labels sit in. */}
+          <div style={{ height: AXIS_H }} />
 
           {visible.map(({ lane, rows }) => (
             <div

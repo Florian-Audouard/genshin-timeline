@@ -103,7 +103,7 @@ describe('position', () => {
 describe('dayAxis', () => {
   // win spans 2026-07-01 00:00 → 2026-07-31 00:00 in Asia (UTC+8): 30 days.
   it('emits one aligned cell per server-local day', () => {
-    const { days } = dayAxis(win, 'asia', win.from)
+    const days = dayAxis(win, 'asia', win.from)
     expect(days).toHaveLength(30)
     expect(days[0]!.day).toBe(1)
     expect(days[0]!.leftPct).toBeCloseTo(0, 6)
@@ -115,21 +115,25 @@ describe('dayAxis', () => {
       from: parseWallClock('2026-07-30 00:00:00') - 8 * 3_600_000,
       to: parseWallClock('2026-08-03 00:00:00') - 8 * 3_600_000,
     }
-    const { days } = dayAxis(augWin, 'asia', augWin.from)
+    const days = dayAxis(augWin, 'asia', augWin.from)
     const labelled = days.filter((d) => d.monthLabel !== null)
     expect(labelled.map((d) => d.day)).toEqual([30, 1]) // first cell (Jul 30) + Aug 1
     expect(days.find((d) => d.day === 1)!.isMonthStart).toBe(true)
     expect(days.find((d) => d.day === 31)!.monthLabel).toBeNull()
   })
 
-  it('flags today and phases the grid when the window starts mid-day', () => {
+  it('flags exactly one cell as today', () => {
     const midDay = win.from + 6 * 3_600_000
-    const { days, gridShift } = dayAxis(win, 'asia', midDay)
-    expect(days.filter((d) => d.isToday)).toHaveLength(1)
-    // window opens 6h into the day → next midnight is 18h (0.75 day) away.
-    const off = dayAxis({ from: midDay, to: win.to }, 'asia', midDay)
-    expect(off.gridShift).toBeCloseTo(0.75, 6)
-    expect(gridShift).toBeCloseTo(0, 6)
+    expect(dayAxis(win, 'asia', midDay).filter((d) => d.isToday)).toHaveLength(1)
+  })
+
+  it('keeps cells on midnight when the window opens mid-day', () => {
+    const midDay = win.from + 6 * 3_600_000
+    const days = dayAxis({ from: midDay, to: win.to }, 'asia', midDay)
+    // The first cell is the midnight before the window opens, so it sits 6h
+    // (a quarter day) to the left of the window's edge.
+    expect(days[0]!.leftPct).toBeLessThan(0)
+    expect(days[1]!.instant - days[0]!.instant).toBe(86_400_000)
   })
 })
 
